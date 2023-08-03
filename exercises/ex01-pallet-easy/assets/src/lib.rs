@@ -148,6 +148,16 @@ pub mod pallet {
 			// - Insert this metadata in the Metadata storage, under the asset_id key.
 			// - Deposit a `MetadataSet` event.
 
+			let metadata = AssetMetadata::new(name.clone(), symbol.clone());
+
+			Metadata::<T>::insert(asset_id, metadata);
+
+			Self::deposit_event(Event::<T>::MetadataSet {
+				asset_id,
+				name: name.clone(),
+				symbol: symbol.clone(),
+			});
+
 			Ok(())
 		}
 
