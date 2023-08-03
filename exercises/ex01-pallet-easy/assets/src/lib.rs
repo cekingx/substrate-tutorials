@@ -171,6 +171,8 @@ pub mod pallet {
 			// TODO:
 			// - Ensure the extrinsic origin is a signed transaction.
 			// - Ensure the caller is the asset owner.
+			let origin = ensure_signed(origin.clone())?;
+			Self::ensure_is_owner(asset_id, origin.clone())?;
 
 			let mut minted_amount = 0;
 
@@ -188,7 +190,13 @@ pub mod pallet {
 				*balance += minted_amount;
 			});
 
+			let assetDetail = Self::asset(asset_id).unwrap();
 			// TODO: Deposit a `Minted` event.
+			Self::deposit_event(Event::<T>::Minted {
+				asset_id,
+				owner: to,
+				total_supply: assetDetail.supply,
+			});
 
 			Ok(())
 		}
