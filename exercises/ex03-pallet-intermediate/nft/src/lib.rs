@@ -15,8 +15,8 @@ use types::*;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::pallet_prelude::*;
-	use frame_system::pallet_prelude::*;
+	use frame_support::{pallet_prelude::*, traits::{fungible::Inspect, tokens::AssetId}};
+	use frame_system::pallet_prelude::{*, OriginFor};
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config + scale_info::TypeInfo {
@@ -128,7 +128,45 @@ pub mod pallet {
 			amount: u128,
 			to: T::AccountId,
 		) -> DispatchResult {
+			let origin = ensure_signed(origin)?;
+
+			ensure!(
+				Self::unique_asset(asset_id).is_some(),
+				Error::<T>::UnknownAssetId
+			);
+
+			Self::ensure_own_some(asset_id, origin.clone())?;
+
+			let mut transferred_amount = 0;
+
+			Account::<T>::mutate(asset_id, origin.clone(), |balance| {
+				let old_balance = *balance;
+				*balance = old_balance.saturating_sub(amount);
+				transferred_amount = old_balance - *balance;
+			});
+
+			Account::<T>::mutate(asset_id, to.clone(), |balance| {
+				*balance += transferred_amount;
+			});
+
+			Self::deposit_event(Event::<T>::Transferred {
+				asset_id,
+				from: origin.clone(),
+				to: to.clone(),
+				amount: transferred_amount,
+			});
+
 			Ok(())
 		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		fn ensure_own_some(asset_id: UniqueAssetId, account: T::AccountId) -> Result<(), Error<T>> {
+			let owned = Self::account(asset_id, account);
+
+			ensure!(owned > 0, Error::<T>::NotOwned);
+
+			Ok(())
+		} 
 	}
 }
