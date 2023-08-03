@@ -13,7 +13,7 @@ mod tests;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::pallet_prelude::*;
+	use frame_support::pallet_prelude::{*, DispatchResult};
 	use frame_system::pallet_prelude::*;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -190,12 +190,12 @@ pub mod pallet {
 				*balance += minted_amount;
 			});
 
-			let assetDetail = Self::asset(asset_id).unwrap();
+			let asset_detail = Self::asset(asset_id).unwrap();
 			// TODO: Deposit a `Minted` event.
 			Self::deposit_event(Event::<T>::Minted {
 				asset_id,
 				owner: to,
-				total_supply: assetDetail.supply,
+				total_supply: asset_detail.supply,
 			});
 
 			Ok(())
@@ -208,6 +208,32 @@ pub mod pallet {
 			// - Mutate the total supply.
 			// - Mutate the account balance.
 			// - Emit a `Burned` event.
+			let origin = ensure_signed(origin)?;
+
+			let mut burned_amount = 0;
+
+			Account::<T>::mutate(asset_id, origin.clone(), |balance| {
+				let old_balance = *balance;
+				let new_balance = old_balance.saturating_sub(amount);
+				burned_amount = old_balance - new_balance;
+				*balance = new_balance;
+			});
+
+			Asset::<T>::try_mutate(asset_id, |maybe_details| -> DispatchResult {
+				let details = maybe_details.as_mut().ok_or(Error::<T>::UnknownAssetId)?;
+
+				details.supply = details.supply.saturating_sub(burned_amount);
+
+				Ok(())
+			})?;
+
+			let asset_detail = Self::asset(asset_id).unwrap();
+
+			Self::deposit_event(Event::<T>::Burned {
+				asset_id,
+				owner: origin,
+				total_supply: asset_detail.supply,
+			});
 
 			Ok(())
 		}
