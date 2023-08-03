@@ -94,6 +94,25 @@ pub mod pallet {
 			metadata: BoundedVec<u8, T::MaxLength>,
 			supply: u128,
 		) -> DispatchResult {
+			let origin = ensure_signed(origin.clone())?;
+
+			ensure!(supply > 1, Error::<T>::NoSupply);
+
+			let id = Self::nonce();
+			let asset_detail = UniqueAssetDetails::<T, T::MaxLength>::new(origin.clone(), metadata, supply);
+
+			UniqueAsset::<T>::insert(id, asset_detail);
+			Nonce::<T>::set(id.saturating_add(1));
+
+			Account::<T>::mutate(id, origin.clone(), |balance| {
+				*balance = balance.saturating_add(supply);
+			});
+
+			Self::deposit_event(Event::<T>::Created {
+				creator: origin.clone(),
+				asset_id: id,
+			});
+
 			Ok(())
 		}
 
